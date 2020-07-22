@@ -1,0 +1,300 @@
+---
+title: "Fear of Missing Out and Social Media Use: Differential Effects of Priming on Attitudes Towards Products"
+output: html_notebook
+---
+
+Author: omitted for blind review
+last change: 07-22-2020
+
+```{r global_options, include = FALSE}
+rm(list=ls())
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+## SETUP
+```{r results = FALSE}
+### INSTALL PACKAGES
+list_of_packages <- c("tidyverse",
+                      "psy",
+                      "psych",
+                      "plyer",
+                      "paran",
+                      "sjPlot",
+                      "sjmisc",
+                      "sjlabelled",
+                      "sjstats",
+                      "jtools",
+                      "interaction")
+
+new_packages <- list_of_packages[!(list_of_packages %in% installed.packages()[,"Package"])]
+if(length(new_packages)) install.packages(new_packages)
+
+### LIBRARIES
+# General
+library(tidyverse)
+library(psy)
+library(psych)
+library(plyr)
+# Factor analysis
+library(paran)
+library(lavaan)
+# Visuals
+library(sjPlot)
+library(sjmisc)
+library(sjlabelled)
+library(sjstats)
+# Johnson Neyman
+library(jtools)
+library(interactions)
+
+### FUNCTIONS
+# Create a construct and retrieve Cronbach's alpha
+constructCreation <- function(originalDataSet, itemPrefix, constructName){
+  dat_temp <- originalDataSet %>%
+    dplyr::select(starts_with(itemPrefix))
+  alphaScores <- alpha(dat_temp)
+  originalDataSet$constructName <- rowMeans(dat_temp)
+  print(alphaScores)
+  return(originalDataSet)}
+
+### DATASET
+# Read and display data
+dat <- read.csv(file.choose())
+
+### MISSING VALUES
+dat[dat == -99] <- NA
+```
+
+```{r results = FALSE}
+### BINARY CODING
+# Condition
+dat$condition <- factor(dat$condition,
+                    levels = c("no priming", "priming"))
+
+dat$condition_b[dat$condition == "priming"] <- 1
+dat$condition_b[dat$condition == "no priming"] <- 0
+# Product
+dat$houseplant_b[dat$product == "house plant"] <- 1
+dat$houseplant_b[dat$product != "house plant"] <- 0
+
+dat$monstera_b[dat$product == "house plant" & dat$type == "hedonic"] <- 1
+dat$monstera_b[is.na(dat$monstera_b)] <- 0
+
+dat$basil_b[dat$product == "house plant" & dat$type == "utilitarian"] <- 1
+dat$basil_b[is.na(dat$basil_b)] <- 0
+
+dat$artsy_b[dat$product == "wall clock" & dat$type == "hedonic"] <- 1
+dat$artsy_b[is.na(dat$artsy_b)] <- 0
+
+# Store
+dat$ikea_b[dat$store == "IKEA"] <- 1
+dat$ikea_b[dat$store != "IKEA"] <- 0
+
+### REORDERING FACTORS
+# Gender
+dat$gender <- factor(dat$gender, levels = c("Male", "Female"))
+# Race
+dat$race <- factor(dat$race, levels = c("Caucasian", "Black or African American", "Hispanic", "Asian", "Mixed", "Other"))
+# Education
+dat$education <- factor(dat$education, levels = c("Less than high school", "High school", "Some college but no degree", "Associate degree", "Bachelor's degree", "Master's degree", "Doctoral degree", "Professional degree"))
+# Income
+dat$income <- factor(dat$income, levels = c("Less than 10,000 USD", "10,000 USD - 49,999 USD", "50,000 USD - 99,999 USD", "100,000 USD - 149,999 USD", "150,000 USD or more"))
+```
+
+# Sample
+Data were collected in a two-step process: We collected data for the ‘plants’-conditions (N = 836) using the Qualtrics (www.qualtrics.com) participant pool. Then we collected data for the ‘wall clocks’-conditions (N = 421) using the Dynata participant pool (www.dynata.com). We employed probability sampling, and participants were compensated based on their respective panel memberships. However, the first sample (‘plants’) included three priming conditions (‘no priming’, ‘priming with 14 likes’, and ‘priming with 14,183 likes’) whereas the second sample (‘wall clocks’) only contained two priming conditions (‘no priming’ and ‘priming with 14,183 likes’). Based on a full between-subjects design, we dropped the priming condition with only 14 likes from the first sample (N = 276), to match the studies’ design. No participants were excluded based on missing data points. The final sample was composed of N = 980 participants who reside in the United States, who are between 18 and 35 years old, and who have an active Instagram account. Participants were predominantly female (69%). Most participants identified as Caucasian (71%), had completed some college with no degree (29%), and had an annual household income between USD10,000 and USD49,999 (44%). The median age was 26 years. 
+```{r  results = FALSE}
+### CELL SIZES
+nrow(dat)
+factorialdesign <- xtabs(~condition + product, data = dat)
+print(factorialdesign)
+
+### DEMOGRAPHICS
+# Age
+summary(dat$age)
+# Gender
+print(xtabs(~gender + product + condition, data = dat))
+# Race
+print(xtabs(~race + product + condition, data = dat))
+# Education
+print(xtabs(~education + product + condition, data = dat))
+# Income
+print(xtabs(~income + product + condition, data = dat))
+```
+
+# Construct
+Attitude toward the product (α = 0.94) was assessed using a nine-item, seven-point semantic differential scale (e.g., “not worth having” = 1 to “worth having” = 7) based on Benedek and Miner (2002). <br>
+We manipulated priming condition by showing participants in the priming condition a screenshot of the product embedded in an Instagram frame prior to viewing the online shop stimulus. Participants in the no priming condition were not exposed to this additional Instagram stimulus. <p>
+Degree of participation within Instagram (α = 0.87) was assessed using a six-item, six-point semantic differential scale (e.g. “passive” = 1 to “active” = 6) based on prior research (Bolton, 2013; Schlosser, 2005; Shao, 2009). Fear of missing out (α = 0.84) was assessed using an eight-item, seven-point Likert-type scale (e.g., “I get anxious when I don't know what my friends are up to”), based on Abel et al. (2016) and Przybylski et al. (2013).<br>
+We assessed several control variables to account for possible confounds. We assessed experience with online shopping (α = 0.89) using a three item, seven-point Likert-type scale (e.g. “I shop online frequently”, “strongly disagree” = 1 to “strongly agree” = 7) (Khalifa & Liu, 2007). Attitude toward popular products (α = 0.92) was assessed using a six-item seven-point Likert-type scale (e.g. “Buying a popular product makes me feel good”, “strongly disagree” = 1 to “strongly agree” = 7) based on prior research (Burton, Lichtenstein, Netemeyer, & Garretson, 1998). Attitude toward Instagram (α = 0.90) was assessed using an adapted version of the Facebook Intensity Scale (Ellison, Steinfield, & Lampe, 2007). We included six items on a seven-point Likert-type scale (e.g. “Instagram is part of my everyday activity”, “strongly disagree” = 1 to “strongly agree” = 7). We included store familiarity (α = 0.92) using a three item, seven-point semantic differential scale (e.g. “unfamiliar” = 1 to “familiar” = 7) (Kent & Allen, 1994).
+
+```{r results = FALSE}
+### DEPENDENT VARIABLE
+# Attitude
+dat <- constructCreation(dat, "attitude")
+colnames(dat)[which(names(dat) == "constructName")] <- "attitude.constr"
+
+### MODERATOR
+# Participation
+dat <- constructCreation(dat, "participation_")
+colnames(dat)[which(names(dat) == "constructName")] <- "participation.constr"
+# FOMO
+dat <- constructCreation(dat, "fomo_")
+colnames(dat)[which(names(dat) == "constructName")] <- "fomo.constr"
+
+### COVARIATES
+# Experience online shopping
+dat <- constructCreation(dat, "online_shopping_")
+colnames(dat)[which(names(dat) == "constructName")] <- "online_shopping.constr"
+# Attitude popular products
+dat <- constructCreation(dat, "popular_products_")
+colnames(dat)[which(names(dat) == "constructName")] <- "popular_products.constr"
+# Attitude toward Instagram
+dat <- constructCreation(dat, "insta_attitude_")
+colnames(dat)[which(names(dat) == "constructName")] <- "insta_attitude.constr"
+# Store familiarity
+dat <- constructCreation(dat, "store_familiarity_")
+colnames(dat)[which(names(dat) == "constructName")] <- "store_familiarity.constr"
+```
+
+```{r results = FALSE}
+### Confirmatory factor analysis
+# Model specification
+cfa_raw <- "Attitudes =~ attitude_1 + attitude_2 + attitude_3 + attitude_4 + attitude_5 + attitude_6 + attitude_7 + attitude_8 + attitude_9
+            FOMO =~ fomo_1 + fomo_2 + fomo_3 + fomo_4 + fomo_5 + fomo_6 + fomo_7 + fomo_8
+            Participation =~ participation_1 + participation_2 + participation_3 + participation_4 + participation_5 + participation_6"
+
+# Compute model
+cfa_fit_raw <- cfa(cfa_raw, data = dat)
+
+# Print model
+summary(cfa_fit_raw, standardized = TRUE, fit.measures = TRUE)
+```
+
+```{r results = FALSE}
+### Average variance extraced
+semTools::reliability(cfa_fit_raw)
+sqrt(0.6243977)
+sqrt(0.3909649)
+sqrt(0.5350506)
+```
+
+# Overview data
+```{r}
+### CORRELATIONS
+# Subsetting
+dat_correlations <- dat %>%
+  dplyr::select("attitude.constr", "fomo.constr", "participation.constr", "popular_products.constr", "online_shopping.constr", "insta_attitude.constr", "store_familiarity.constr", "condition_b", "monstera_b", "basil_b", "artsy_b", "ikea_b")
+# Visualizing
+correlations <- sjt.corr(dat_correlations,
+                         corr.method = "pearson",
+                         title = "Correlations",
+                         var.labels = c("Attitude", "FOMO", "Participation", "Attitude toward popular products", "Online shopping experience", "Attitude toward Instagram", "Store familiarity",                                                "Priming", "Monstera", "Basil", "Artsy wall clock", "IKEA"),
+                         fade.ns = FALSE, digits = 2, triangle = "lower")
+
+### MEANS AND SDS
+# Means
+Means <- c(mean(dat$attitude.constr, na.rm = TRUE),
+           mean(dat$fomo.constr, na.rm = TRUE),
+           mean(dat$participation.constr, na.rm = TRUE),
+           mean(dat$popular_products.constr, na.rm = TRUE),
+           mean(dat$online_shopping.constr, na.rm = TRUE),
+           mean(dat$insta_attitude.constr, na.rm = TRUE),
+           mean(dat$store_familiarity.constr, na.rm = TRUE))
+# SDs
+SD <- c(sd(dat$attitude.constr, na.rm = TRUE),
+        sd(dat$fomo.constr, na.rm = TRUE),
+        sd(dat$participation.constr, na.rm = TRUE),
+        sd(dat$popular_products.constr, na.rm = TRUE),
+        sd(dat$online_shopping.constr, na.rm = TRUE),
+        sd(dat$insta_attitude.constr, na.rm = TRUE),
+        sd(dat$store_familiarity.constr, na.rm = TRUE))
+# Combining
+descriptives <- cbind(Means, SD)
+# Printing
+print(descriptives, digits = 3)
+```
+
+
+# Analysis
+```{r results = FALSE}
+### STANDARDIZING
+dat$fomo.constr_std <- c(scale(dat$fomo.constr))
+dat$participation.constr_std <- c(scale(dat$participation.constr))
+dat$attitude.constr_std <- c(scale(dat$attitude.constr))
+dat$popular_products.constr_std <- c(scale(dat$popular_products.constr))
+dat$online_shopping.constr_std <- c(scale(dat$online_shopping.constr))
+dat$store_familiarity.constr_std <- c(scale(dat$store_familiarity.constr))
+dat$insta_attitude.constr_std <- c(scale(dat$insta_attitude.constr))
+```
+### Interaction analysis
+#### Threeway interaction
+```{r}
+lm_interaction_overall <- lm(attitude.constr_std ~ condition * fomo.constr_std * participation.constr_std + popular_products.constr_std + online_shopping.constr_std + store_familiarity.constr_std + insta_attitude.constr_std + monstera_b + basil_b + artsy_b, data = dat)
+summary(lm_interaction_overall)
+car::vif(lm_interaction_overall)
+table1 <- sjPlot::tab_model(lm_interaction_overall)
+```
+##### Plotting
+```{r}
+interact_plot(lm_interaction_overall,
+              pred = participation.constr_std, modx = fomo.constr_std, mod2 = condition,
+              x.label = "Instagram participation",
+              y.label = "Attitude toward product",
+              pred.labels = "Instagram participation",
+              modx.labels = "FOMO",
+              mod2.labels = c("No priming condition", "Priming condition"),
+              colors = "Qual3")
+```
+#### Subsetting
+```{r}
+dat_prime <- dat %>%
+  dplyr::filter(condition == "priming")
+dat_noprime <- dat %>%
+  dplyr::filter(condition == "no priming")
+```
+#### Regression: Primed individuals
+```{r}
+lm_interaction_prime <- lm(attitude.constr_std ~ fomo.constr_std * participation.constr_std + popular_products.constr_std + online_shopping.constr_std + store_familiarity.constr_std + insta_attitude.constr_std + monstera_b + basil_b + artsy_b, data = dat_prime)
+summary(lm_interaction_prime)
+car::vif(lm_interaction_prime)
+```
+##### Johnson-Neyman technique
+```{r}
+jnplot_prime <- johnson_neyman(lm_interaction_prime,
+                               pred  = participation.constr_std, modx  = fomo.constr_std,
+                               alpha = .05, sig.color = "#797979", insig.color = "#DEDEDE")
+jnplot_prime
+jnplot_prime$plot +
+  ggtitle("Johnson-Neyman plot for primed participants") +
+  xlab("FOMO") +
+  ylab("Instagram participation")
+```
+#### Regression: Not primed individuals
+```{r}
+lm_interaction_noprime <- lm(attitude.constr_std ~ fomo.constr_std * participation.constr_std + popular_products.constr_std + online_shopping.constr_std + store_familiarity.constr_std + insta_attitude.constr_std + monstera_b + basil_b + artsy_b, data = dat_noprime)
+summary(lm_interaction_noprime)
+car::vif(lm_interaction_noprime)
+```
+##### Johnson-Neyman technique
+```{r}
+jnplot_noprime <- johnson_neyman(lm_interaction_noprime,
+                                 pred  = participation.constr_std, modx  = fomo.constr_std,
+                                 alpha = .05, sig.color = "#797979", insig.color = "#DEDEDE")
+jnplot_noprime
+jnplot_noprime$plot +
+  ggtitle("Johnson-Neyman plot for not primed participants") +
+  xlab("FOMO") +
+  ylab("Instagram participation")
+```
+```{r results = FALSE}
+table2 <- sjPlot::tab_model(lm_interaction_noprime, lm_interaction_prime)
+```
+
+### Participation
+```{r}
+lm_participation <- lm(participation.constr_std ~ popular_products.constr_std + online_shopping.constr_std + insta_attitude.constr_std, data = dat)
+summary(lm_participation)
+```
