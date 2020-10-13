@@ -16,18 +16,7 @@ knitr::opts_chunk$set(echo = FALSE,
 ## SETUP
 ```{r results = FALSE}
 ### INSTALL PACKAGES
-list_of_packages <- c("tidyverse",
-                      "psy",
-                      "psych",
-                      "plyer",
-                      "paran",
-                      "sjPlot",
-                      "sjmisc",
-                      "sjlabelled",
-                      "sjstats",
-                      "jtools",
-                      "interaction")
-
+list_of_packages <- c("tidyverse", "psy", "psych", "plyer",  "paran", "sjPlot", "sjmisc", "sjlabelled", "sjstats", "jtools", "interaction")
 new_packages <- list_of_packages[!(list_of_packages %in% installed.packages()[,"Package"])]
 if(length(new_packages)) install.packages(new_packages)
 
@@ -37,14 +26,17 @@ library(tidyverse)
 library(psy)
 library(psych)
 library(plyr)
+
 # Factor analysis
 library(paran)
 library(lavaan)
+
 # Visuals
 library(sjPlot)
 library(sjmisc)
 library(sjlabelled)
 library(sjstats)
+library(table1)
 # Johnson Neyman
 library(jtools)
 library(interactions)
@@ -105,23 +97,17 @@ dat$income <- factor(dat$income, levels = c("Less than 10,000 USD", "10,000 USD 
 
 # Sample
 Data were collected in a two-step process: We collected data for the ‘plants’-conditions (N = 836) using the Qualtrics (www.qualtrics.com) participant pool. Then we collected data for the ‘wall clocks’-conditions (N = 421) using the Dynata participant pool (www.dynata.com). We employed probability sampling, and participants were compensated based on their respective panel memberships. However, the first sample (‘plants’) included three priming conditions (‘no priming’, ‘priming with 14 likes’, and ‘priming with 14,183 likes’) whereas the second sample (‘wall clocks’) only contained two priming conditions (‘no priming’ and ‘priming with 14,183 likes’). Based on a full between-subjects design, we dropped the priming condition with only 14 likes from the first sample (N = 276), to match the studies’ design. No participants were excluded based on missing data points. The final sample was composed of N = 980 participants who reside in the United States, who are between 18 and 35 years old, and who have an active Instagram account. Participants were predominantly female (69%). Most participants identified as Caucasian (71%), had completed some college with no degree (29%), and had an annual household income between USD10,000 and USD49,999 (44%). The median age was 26 years. 
-```{r  results = FALSE}
-### CELL SIZES
-nrow(dat)
-factorialdesign <- xtabs(~condition + product, data = dat)
-print(factorialdesign)
 
-### DEMOGRAPHICS
-# Age
-summary(dat$age)
-# Gender
-print(xtabs(~gender + product + condition, data = dat))
-# Race
-print(xtabs(~race + product + condition, data = dat))
-# Education
-print(xtabs(~education + product + condition, data = dat))
-# Income
-print(xtabs(~income + product + condition, data = dat))
+```{r}
+label(dat$age) <- "Age"
+label(dat$gender) <- "Gender"
+label(dat$race) <- "Race"
+label(dat$education) <- "Highest education"
+label(dat$income) <- "Household income"
+
+units(dat$age) <- "Years"
+
+table_generaldemographics <- table1(~ age + gender + race + education + income | condition + product, data = dat)
 ```
 
 # Construct
@@ -229,6 +215,7 @@ dat$online_shopping.constr_std <- c(scale(dat$online_shopping.constr))
 dat$store_familiarity.constr_std <- c(scale(dat$store_familiarity.constr))
 dat$insta_attitude.constr_std <- c(scale(dat$insta_attitude.constr))
 ```
+
 ### Interaction analysis
 #### Threeway interaction
 ```{r}
@@ -237,17 +224,19 @@ summary(lm_interaction_overall)
 car::vif(lm_interaction_overall)
 table1 <- sjPlot::tab_model(lm_interaction_overall)
 ```
+
 ##### Plotting
 ```{r}
 interact_plot(lm_interaction_overall,
-              pred = participation.constr_std, modx = fomo.constr_std, mod2 = condition,
-              x.label = "Instagram participation",
+              pred = fomo.constr_std, modx = participation.constr_std, mod2 = condition,
+              x.label = "Fear of missing out",
               y.label = "Attitude toward product",
-              pred.labels = "Instagram participation",
-              modx.labels = "FOMO",
-              mod2.labels = c("No priming condition", "Priming condition"),
+              pred.labels = "Fear of missing out",
+              legend.main = "Instagram participation",
+              mod2.labels = c("Control", "Instagram advertising"),
               colors = "Qual3")
 ```
+
 #### Subsetting
 ```{r}
 dat_prime <- dat %>%
@@ -255,39 +244,43 @@ dat_prime <- dat %>%
 dat_noprime <- dat %>%
   dplyr::filter(condition == "no priming")
 ```
+
 #### Regression: Primed individuals
 ```{r}
 lm_interaction_prime <- lm(attitude.constr_std ~ fomo.constr_std * participation.constr_std + popular_products.constr_std + online_shopping.constr_std + store_familiarity.constr_std + insta_attitude.constr_std + monstera_b + basil_b + artsy_b, data = dat_prime)
 summary(lm_interaction_prime)
 car::vif(lm_interaction_prime)
 ```
+
 ##### Johnson-Neyman technique
 ```{r}
 jnplot_prime <- johnson_neyman(lm_interaction_prime,
-                               pred  = participation.constr_std, modx  = fomo.constr_std,
+                               pred  = fomo.constr_std, modx  = participation.constr_std,
                                alpha = .05, sig.color = "#797979", insig.color = "#DEDEDE")
 jnplot_prime
 jnplot_prime$plot +
-  ggtitle("Johnson-Neyman plot for primed participants") +
-  xlab("FOMO") +
-  ylab("Instagram participation")
+  ggtitle("Johnson-Neyman plot for participants in Instagram condition") +
+  xlab("Instagram participation") +
+  ylab("Fear of missing out")
 ```
+
 #### Regression: Not primed individuals
 ```{r}
 lm_interaction_noprime <- lm(attitude.constr_std ~ fomo.constr_std * participation.constr_std + popular_products.constr_std + online_shopping.constr_std + store_familiarity.constr_std + insta_attitude.constr_std + monstera_b + basil_b + artsy_b, data = dat_noprime)
 summary(lm_interaction_noprime)
 car::vif(lm_interaction_noprime)
 ```
+
 ##### Johnson-Neyman technique
 ```{r}
 jnplot_noprime <- johnson_neyman(lm_interaction_noprime,
-                                 pred  = participation.constr_std, modx  = fomo.constr_std,
+                                 pred = fomo.constr_std, modx  = participation.constr_std,
                                  alpha = .05, sig.color = "#797979", insig.color = "#DEDEDE")
 jnplot_noprime
 jnplot_noprime$plot +
-  ggtitle("Johnson-Neyman plot for not primed participants") +
-  xlab("FOMO") +
-  ylab("Instagram participation")
+  ggtitle("Johnson-Neyman plot for participants in control condition") +
+  xlab("Instagram participation") +
+  ylab("Fear of missing out")
 ```
 ```{r results = FALSE}
 table2 <- sjPlot::tab_model(lm_interaction_noprime, lm_interaction_prime)
